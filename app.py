@@ -2,24 +2,24 @@ from shiny import App, render, ui, reactive
 import pandas as pd
 
 # Cargar datos desde archivos CSV
-
 df_tiendas = pd.read_csv("data/tiendas.csv")
-claves_correctas = dict(zip(df_tiendas["tienda"], df_tiendas["clave"].astype(str)))
-
+df_cajas = pd.read_csv("data/cajas.csv")
 clases_gasto = pd.read_csv("data/clases_gasto.csv")["clase"].tolist()
 otros_medios_pago = pd.read_csv("data/otros_medios_pago.csv")["medio"].tolist()
+
+claves_correctas = dict(zip(df_tiendas["tienda"], df_tiendas["clave"].astype(str)))
+caja_ids = df_cajas["id"].tolist()
 
 app_ui = ui.page_fluid(
     ui.layout_columns(
         ui.column(12,
-              
             ui.input_select("tienda", "Tienda", {tienda: tienda for tienda in df_tiendas["tienda"]}),
             ui.input_select("clave_tienda", "", {
                 "Clave de la tienda": "Clave de la tienda",
                 **{clave: clave for clave in df_tiendas["clave"].astype(str)}
             }),
             ui.output_ui("validacion_tienda"),
-                        
+
             ui.accordion(
                 ui.accordion_panel("Gastos", 
                     *[item for i in range(1, 8) for item in (
@@ -46,11 +46,10 @@ app_ui = ui.page_fluid(
                     ui.input_numeric("datafono", "Datáfono", value=0)
                 ),
                 ui.accordion_panel("Cajas",
-                    ui.input_numeric("caja1", "Caja 1: Siigo POS", value=0),
-                    ui.input_numeric("caja2", "Caja 2: Reparaciones", value=0),
-                    ui.input_numeric("caja3", "Caja 3: Megared", value=0),
-                    ui.input_numeric("caja4", "Caja 4: Abonos Sistecrédito", value=0),
-                    ui.input_numeric("caja5", "Caja 5: Facturas Electrónicas", value=0)
+                    *[
+                        ui.input_numeric(f"caja{row.id}", row.nombre, value=0)
+                        for row in df_cajas.itertuples(index=False)
+                    ]
                 ),
                 open=False,
                 multiple=False
@@ -72,8 +71,6 @@ app_ui = ui.page_fluid(
                 ui.p(ui.strong(ui.output_ui("sobrante"))),
                 ui.hr(),
                 ui.p(ui.strong(ui.output_ui("ventas_dia")))
-                
-                
             )
         )
     )
@@ -104,7 +101,6 @@ def server(input, output, session):
 
     @render.ui
     def validacion_tienda():
-        # claves_correctas ya está definido globalmente
         tienda = input.tienda()
         clave = input.clave_tienda()
         if tienda in claves_correctas and clave != "Clave de la tienda":
@@ -150,13 +146,16 @@ def server(input, output, session):
 
     @render.ui
     def total_cajas():
-        total = sum(safe(input[f"caja{i}"]()) for i in range(1, 6))
+        total = sum(safe(input[f"caja{id}"]()) for id in caja_ids)
         return ui.HTML(f"Total Cajas: ${total:,.0f}")
-    
+
     @render.ui
     def ventas_dia():
-        total = sum(safe(input[f"caja{i}"]()) for i in range(1, 6)) - safe(input.caja4())
-        #no suma caja4 porque es abonos
+        total = sum(
+            safe(input[f"caja{row.id}"]())
+            for row in df_cajas.itertuples(index=False)
+            if "abonos" not in row.nombre.lower()
+        )
         return ui.HTML(f"<strong>Ventas del día:</strong> ${total:,.0f}")
 
     @render.ui
@@ -183,8 +182,8 @@ def server(input, output, session):
         efectivo = safe(input.efectivo())
         datafono = safe(input.datafono())
         total_pagos = total_gastos + total_otros + efectivo + datafono
-        total_cajas = sum(safe(input[f"caja{i}"]()) for i in range(1, 6))
-        diferencia = total_cajas - total_pagos
+        total_cajas_valor = sum(safe(input[f"caja{id}"]()) for id in caja_ids)
+        diferencia = total_cajas_valor - total_pagos
         etiqueta = "Faltante" if diferencia >= 0 else "Sobrante"
         color = "black" if diferencia == 0 else "red"
         return ui.HTML(f"<span style='color: {color}; font-weight: bold;'>{etiqueta}: ${abs(diferencia):,.0f}</span>")
