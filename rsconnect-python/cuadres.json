@@ -1,0 +1,12 @@
+{
+    "https://api.shinyapps.io": {
+        "server_url": "https://api.shinyapps.io",
+        "filename": "C:\\Users\\User\\Documents\\GitHub\\cuadres",
+        "app_url": "https://reportedecierre.shinyapps.io/apppy/",
+        "app_id": 14426950,
+        "app_guid": null,
+        "title": "app.py",
+        "app_mode": "python-shiny",
+        "app_store_version": 1
+    }
+}

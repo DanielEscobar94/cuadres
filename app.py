@@ -1,25 +1,22 @@
 from shiny import App, render, ui, reactive
+import pandas as pd
+
+# Cargar datos desde archivos CSV
+
+df_tiendas = pd.read_csv("data/tiendas.csv")
+claves_correctas = dict(zip(df_tiendas["tienda"], df_tiendas["clave"].astype(str)))
+
+clases_gasto = pd.read_csv("data/clases_gasto.csv")["clase"].tolist()
+otros_medios_pago = pd.read_csv("data/otros_medios_pago.csv")["medio"].tolist()
 
 app_ui = ui.page_fluid(
     ui.layout_columns(
         ui.column(12,
               
-            ui.input_select("tienda", "Tienda", {
-                "Mayorca": "Mayorca", 
-                "La Central": "La Central", 
-                "San Diego": "San Diego",
-                "Molinos": "Molinos",
-                "Puerta del Norte": "Puerta del Norte",
-                "Oficina": "Oficina"
-            }),
+            ui.input_select("tienda", "Tienda", {tienda: tienda for tienda in df_tiendas["tienda"]}),
             ui.input_select("clave_tienda", "", {
                 "Clave de la tienda": "Clave de la tienda",
-                "1011": "1011",
-                "1021": "1021",
-                "1031": "1031",
-                "1104": "1104",
-                "1080": "1080",
-                "1071": "1071"
+                **{clave: clave for clave in df_tiendas["clave"].astype(str)}
             }),
             ui.output_ui("validacion_tienda"),
                         
@@ -29,15 +26,7 @@ app_ui = ui.page_fluid(
                         ui.input_numeric(f"valor_Gasto{i}", f"Gasto {i}", value=0),
                         ui.input_select(f"clase_de_gasto{i}", "", {
                             "seleccionar_gasto": "Clase de Gasto",
-                            "Aseo": "Aseo",
-                            "Comida": "Comida",
-                            "Dominical y Festivo": "Dominical y Festivo",
-                            "Horas Extras": "Horas Extras",
-                            "Papelería": "Papelería",
-                            "Servicios públicos e Impuestos": "Servicios públicos e Impuestos",
-                            "Transporte": "Transporte",
-                            "Repuestos": "Repuestos",
-                            "Otros Gastos": "Otros Gastos"
+                            **{g: g for g in clases_gasto}
                         }),
                         ui.input_text(f"descripcion_Gasto{i}", "", placeholder=f"Descripción del gasto {i}")
                     )]
@@ -47,14 +36,7 @@ app_ui = ui.page_fluid(
                         ui.input_numeric(f"valor_otros_medios_pagos{i}", f"Medio de pago {i}", value=0),
                         ui.input_select(f"otro_pago{i}", "", {
                             "seleccionar_medio_de_pago": "medio de pago",
-                            "Tansferencia o consignación Bancolombia Ahorros": "Tansferencia o consignación Bancolombia Ahorros",
-                            "Tansferencia o consignación Bancolombia Corriente": "Tansferencia o consignación Bancolombia Corriente",
-                            "Tansferencia o consignación Davivienda Corriente": "Tansferencia o consignación Davivienda Corriente",
-                            "Rappi": "Rappi",
-                            "Mercado Libre": "Mercado Libre",
-                            "Sistecrédito": "Sistecrédito",
-                            "Tienda Online": "Tienda Online",
-                            "Otra forma de pago": "Otra forma de pago"
+                            **{m: m for m in otros_medios_pago}
                         }),
                         ui.input_text(f"descripcion_otro_pago{i}", "", placeholder=f"Descripción del otro pago {i}")
                     )]
@@ -122,16 +104,9 @@ def server(input, output, session):
 
     @render.ui
     def validacion_tienda():
+        # claves_correctas ya está definido globalmente
         tienda = input.tienda()
         clave = input.clave_tienda()
-        claves_correctas = {
-            "Mayorca": "1011",
-            "La Central": "1021",
-            "San Diego": "1031",
-            "Molinos": "1104",
-            "Puerta del Norte": "1080",
-            "Oficina": "1071"
-        }
         if tienda in claves_correctas and clave != "Clave de la tienda":
             if claves_correctas[tienda] != clave:
                 return ui.HTML("<span style='color: red; font-weight: bold;'>⚠️ Tienda y clave no coinciden</span>")
@@ -141,14 +116,6 @@ def server(input, output, session):
     def total_gastos():
         tienda = input.tienda()
         clave = input.clave_tienda()
-        claves_correctas = {
-            "Mayorca": "1011",
-            "La Central": "1021",
-            "San Diego": "1031",
-            "Molinos": "1104",
-            "Puerta del Norte": "1080",
-            "Oficina": "1071"
-        }
         if tienda in claves_correctas and clave != claves_correctas[tienda]:
             return ui.HTML("")
         total = sum(safe(input[f"valor_Gasto{i}"]()) for i in range(1, 8))
@@ -158,14 +125,6 @@ def server(input, output, session):
     def total_otros_pagos():
         tienda = input.tienda()
         clave = input.clave_tienda()
-        claves_correctas = {
-            "Mayorca": "1011",
-            "La Central": "1021",
-            "San Diego": "1031",
-            "Molinos": "1104",
-            "Puerta del Norte": "1080",
-            "Oficina": "1071"
-        }
         if tienda in claves_correctas and clave != claves_correctas[tienda]:
             return ui.HTML("")
         total = sum(safe(input[f"valor_otros_medios_pagos{i}"]()) for i in range(1, 8))
@@ -175,14 +134,6 @@ def server(input, output, session):
     def total_efectivo():
         tienda = input.tienda()
         clave = input.clave_tienda()
-        claves_correctas = {
-            "Mayorca": "1011",
-            "La Central": "1021",
-            "San Diego": "1031",
-            "Molinos": "1104",
-            "Puerta del Norte": "1080",
-            "Oficina": "1071"
-        }
         if tienda in claves_correctas and clave != claves_correctas[tienda]:
             return ui.HTML("")
         efectivo = safe(input.efectivo())
@@ -192,14 +143,6 @@ def server(input, output, session):
     def total_datafono():
         tienda = input.tienda()
         clave = input.clave_tienda()
-        claves_correctas = {
-            "Mayorca": "1011",
-            "La Central": "1021",
-            "San Diego": "1031",
-            "Molinos": "1104",
-            "Puerta del Norte": "1080",
-            "Oficina": "1071"
-        }
         if tienda in claves_correctas and clave != claves_correctas[tienda]:
             return ui.HTML("")
         datafono = safe(input.datafono())
@@ -213,21 +156,13 @@ def server(input, output, session):
     @render.ui
     def ventas_dia():
         total = sum(safe(input[f"caja{i}"]()) for i in range(1, 6)) - safe(input.caja4())
-        # No suma caja4 porque son abonos, no ventas
+        #no suma caja4 porque es abonos
         return ui.HTML(f"<strong>Ventas del día:</strong> ${total:,.0f}")
 
     @render.ui
     def total_gastos_pagos():
         tienda = input.tienda()
         clave = input.clave_tienda()
-        claves_correctas = {
-            "Mayorca": "1011",
-            "La Central": "1021",
-            "San Diego": "1031",
-            "Molinos": "1104",
-            "Puerta del Norte": "1080",
-            "Oficina": "1071"
-        }
         if tienda in claves_correctas and clave != claves_correctas[tienda]:
             return ui.HTML("")
         total_gastos = sum(safe(input[f"valor_Gasto{i}"]()) for i in range(1, 8))
@@ -241,14 +176,6 @@ def server(input, output, session):
     def sobrante():
         tienda = input.tienda()
         clave = input.clave_tienda()
-        claves_correctas = {
-            "Mayorca": "1011",
-            "La Central": "1021",
-            "San Diego": "1031",
-            "Molinos": "1104",
-            "Puerta del Norte": "1080",
-            "Oficina": "1071"
-        }
         if tienda in claves_correctas and clave != claves_correctas[tienda]:
             return ui.HTML("")
         total_gastos = sum(safe(input[f"valor_Gasto{i}"]()) for i in range(1, 8))

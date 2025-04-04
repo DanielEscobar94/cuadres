@@ -213,8 +213,8 @@ def server(input, output, session):
     @render.ui
     def ventas_dia():
         total = sum(safe(input[f"caja{i}"]()) for i in range(1, 6)) - safe(input.caja4())
-        #no suma caja4 porque es abonos
-        return ui.HTML(f"Ventas del día: ${total:,.0f}")
+        # No suma caja4 porque son abonos, no ventas
+        return ui.HTML(f"<strong>Ventas del día:</strong> ${total:,.0f}")
 
     @render.ui
     def total_gastos_pagos():
