@@ -1,5 +1,7 @@
 from shiny import App, render, ui, reactive
 import pandas as pd
+from datetime import datetime
+from db import insertar_reporte  # Importar la función para guardar en la base de datos
 
 # Cargar datos desde archivos CSV
 df_tiendas = pd.read_csv("data/tiendas.csv")
@@ -70,7 +72,9 @@ app_ui = ui.page_fluid(
                 ui.p(ui.strong(ui.output_ui("total_cajas"))),
                 ui.p(ui.strong(ui.output_ui("sobrante"))),
                 ui.hr(),
-                ui.p(ui.strong(ui.output_ui("ventas_dia")))
+                ui.p(ui.strong(ui.output_ui("ventas_dia"))),
+                ui.input_action_button("guardar", "Guardar cierre", class_="btn-primary"),
+                ui.output_text("mensaje_guardado")
             )
         )
     )
@@ -82,7 +86,6 @@ def safe(input_value):
 def server(input, output, session):
     @render.text
     def fecha_resumen():
-        from datetime import datetime
         import locale
         try:
             locale.setlocale(locale.LC_TIME, 'es_ES.utf8')
@@ -90,7 +93,7 @@ def server(input, output, session):
             try:
                 locale.setlocale(locale.LC_TIME, 'es_CO.utf8')
             except:
-                locale.setlocale(locale.LC_TIME, '')  # fallback
+                locale.setlocale(locale.LC_TIME, '')
 
         fecha_hoy = datetime.today()
         return fecha_hoy.strftime('%A %d de %B del %Y').capitalize()
@@ -187,5 +190,56 @@ def server(input, output, session):
         etiqueta = "Faltante" if diferencia >= 0 else "Sobrante"
         color = "black" if diferencia == 0 else "red"
         return ui.HTML(f"<span style='color: {color}; font-weight: bold;'>{etiqueta}: ${abs(diferencia):,.0f}</span>")
+
+    def recolectar_datos():
+        return {
+            "tienda": input.tienda(),
+            "clave": input.clave_tienda(),
+            "efectivo": safe(input.efectivo()),
+            "datafono": safe(input.datafono()),
+            "gastos": [
+                {
+                    "valor": safe(input[f"valor_Gasto{i}"]()),
+                    "clase": input[f"clase_de_gasto{i}"](),
+                    "descripcion": input[f"descripcion_Gasto{i}"]()
+                }
+                for i in range(1, 8)
+                if safe(input[f"valor_Gasto{i}"]()) > 0
+            ],
+            "otros_pagos": [
+                {
+                    "valor": safe(input[f"valor_otros_medios_pagos{i}"]()),
+                    "medio": input[f"otro_pago{i}"](),
+                    "descripcion": input[f"descripcion_otro_pago{i}"]()
+                }
+                for i in range(1, 8)
+                if safe(input[f"valor_otros_medios_pagos{i}"]()) > 0
+            ],
+            "cajas": [
+                {
+                    "id": row.id,
+                    "valor": safe(input[f"caja{row.id}"]())
+                }
+                for row in df_cajas.itertuples(index=False)
+                if safe(input[f"caja{row.id}"]()) > 0
+            ]
+        }
+
+    @render.text
+    def mensaje_guardado():
+        return ""
+
+    @reactive.event(input.guardar)
+    def guardar_en_db():
+        tienda = input.tienda()
+        clave = input.clave_tienda()
+
+        if tienda not in claves_correctas or claves_correctas[tienda] != clave:
+            output.mensaje_guardado.set("❌ Tienda y clave no coinciden. No se guardó.")
+            return
+
+        data = recolectar_datos()
+        insertar_reporte(data)
+        output.mensaje_guardado.set("✅ Datos guardados exitosamente.")
 
 app = App(app_ui, server)
